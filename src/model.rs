@@ -24,7 +24,8 @@ fn linear_interpolation(x: f64, x0: f64, x1: f64, y0: f64, y1: f64) -> f64 {
 /// # Variants
 /// - `Gy`: Gray (default)
 /// - `CGy`: Centigray
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DoseType {
     #[default]
     Gy,
@@ -43,6 +44,7 @@ pub enum DoseType {
 /// - `v`: Vector of volume values
 /// - `is_sorted`: Whether the data is sorted by dose in ascending order
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Dvh {
     // The unit type for dose
     pub dose_type: DoseType,
@@ -647,6 +649,22 @@ mod tests {
         let result = dvh.vx(7.5);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 85.0);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_dvh_serde() {
+        let mut dvh = Dvh::new(DoseType::CGy);
+        dvh.add(0.0, 100.0);
+        dvh.add(10.0, 80.0);
+        dvh.sort();
+
+        let serialized = serde_json::to_string(&dvh).unwrap();
+        let deserialized: Dvh = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.dose_type, DoseType::CGy);
+        assert_eq!(deserialized.len(), 2);
+        assert_eq!(deserialized.dx(90.0).unwrap(), 5.0);
     }
 }
 
