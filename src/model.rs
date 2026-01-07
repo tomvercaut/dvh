@@ -260,6 +260,26 @@ impl Dvh {
         }
         Err(Error::DvhVxLogic)
     }
+
+    /// Returns a reference to the slice of dose values in the DVH.
+    ///
+    /// The dose values may not be sorted unless [`Dvh::sort`] has been called.
+    ///
+    /// # Returns
+    /// A slice containing all dose values
+    pub fn doses(&self) -> &[f64] {
+        &self.d
+    }
+
+    /// Returns a reference to the slice of volume values in the DVH.
+    ///
+    /// The volume values correspond to the dose values at the same indices.
+    ///
+    /// # Returns
+    /// A slice containing all volume values
+    pub fn volumes(&self) -> &[f64] {
+        &self.v
+    }
 }
 
 #[cfg(test)]
