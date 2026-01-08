@@ -57,7 +57,7 @@ pub enum VolumeType {
 /// - `v`: Vector of volume values
 ///        If the volume type is [Percent](VolumeType::Percent), the values are in the range [0.0, 1.0]
 /// - `is_sorted`: Whether the data is sorted by dose in ascending order
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Dvh {
     // The unit type for dose

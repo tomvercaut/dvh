@@ -1,20 +1,11 @@
 mod dvh;
 mod error;
+mod name;
+mod patient;
+mod plan;
 
-pub use error::*;
 pub use dvh::*;
-
-// pub fn add(left: u64, right: u64) -> u64 {
-//     left + right
-// }
-//
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     #[test]
-//     fn it_works() {
-//         let result = add(2, 2);
-//         assert_eq!(result, 4);
-//     }
-// }
+pub use error::*;
+pub use name::*;
+pub use patient::*;
+pub use plan::*;
