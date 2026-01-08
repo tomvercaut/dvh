@@ -55,6 +55,7 @@ pub enum VolumeType {
 /// - `dose_type`: The unit type for dose measurements
 /// - `d`: Vector of dose values
 /// - `v`: Vector of volume values
+///        If the volume type is [Percent](VolumeType::Percent), the values are in the range [0.0, 1.0]
 /// - `is_sorted`: Whether the data is sorted by dose in ascending order
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -66,6 +67,7 @@ pub struct Dvh {
     // Doses
     d: Vec<f64>,
     // Volumes
+    // If the volume type is [Percent](VolumeType::Percent), the values are in the range [0.0, 1.0]
     v: Vec<f64>,
     // Is the data sorted monotonically incrementally along the dose axis?
     is_sorted: bool,
@@ -110,6 +112,7 @@ impl Dvh {
     /// # Parameters
     /// - `d`: The dose value (must be non-negative)
     /// - `v`: The volume value (must be non-negative)
+    ///        If the volume type is [Percent](VolumeType::Percent), the values are in the range [0.0, 1.0]
     ///
     /// # Returns
     /// `true` if the data point was added successfully, `false` if either value is negative
@@ -118,6 +121,9 @@ impl Dvh {
             return false;
         }
         if v < 0.0 {
+            return false;
+        }
+        if self.volume_type == VolumeType::Percent && v > 1.0 {
             return false;
         }
         self.is_sorted = false;
@@ -146,6 +152,9 @@ impl Dvh {
         }
         for x in v {
             if *x < 0.0 {
+                return false;
+            }
+            if self.volume_type == VolumeType::Percent && *x > 1.0 {
                 return false;
             }
         }
@@ -300,6 +309,7 @@ impl Dvh {
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_ulps_eq;
     use super::*;
 
     #[test]
@@ -345,11 +355,11 @@ mod tests {
         assert_eq!(dvh.len(), 0);
         assert!(dvh.is_empty());
 
-        dvh.add(1.0, 100.0);
+        dvh.add(1.0, 1.0);
         assert_eq!(dvh.len(), 1);
         assert!(!dvh.is_empty());
 
-        dvh.add(2.0, 90.0);
+        dvh.add(2.0, 0.9);
         assert_eq!(dvh.len(), 2);
         assert!(!dvh.is_empty());
     }
@@ -357,7 +367,7 @@ mod tests {
     #[test]
     fn test_dvh_add_valid() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        assert!(dvh.add(1.0, 100.0));
+        assert!(dvh.add(1.0, 1.0));
         assert_eq!(dvh.len(), 1);
         assert!(!dvh.is_sorted);
     }
@@ -372,7 +382,7 @@ mod tests {
     #[test]
     fn test_dvh_add_negative_volume() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        assert!(!dvh.add(1.0, -100.0));
+        assert!(!dvh.add(1.0, -1.0));
         assert_eq!(dvh.len(), 0);
     }
 
@@ -387,7 +397,7 @@ mod tests {
     fn test_dvh_add_slice_valid() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
         let doses = vec![1.0, 2.0, 3.0];
-        let volumes = vec![100.0, 90.0, 80.0];
+        let volumes = vec![1.0, 0.9, 0.8];
         assert!(dvh.add_slice(&doses, &volumes));
         assert_eq!(dvh.len(), 3);
         assert!(!dvh.is_sorted);
@@ -415,7 +425,7 @@ mod tests {
     fn test_dvh_add_slice_negative_volume() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
         let doses = vec![1.0, 2.0, 3.0];
-        let volumes = vec![100.0, -90.0, 80.0];
+        let volumes = vec![1.0, -0.9, 0.8];
         assert!(!dvh.add_slice(&doses, &volumes));
         assert_eq!(dvh.len(), 0);
     }
@@ -432,22 +442,22 @@ mod tests {
     #[test]
     fn test_dvh_sort() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(3.0, 80.0);
-        dvh.add(1.0, 100.0);
-        dvh.add(2.0, 90.0);
+        dvh.add(3.0, 0.8);
+        dvh.add(1.0, 1.0);
+        dvh.add(2.0, 0.9);
 
         dvh.sort();
 
         assert!(dvh.is_sorted);
         assert_eq!(dvh.d, vec![1.0, 2.0, 3.0]);
-        assert_eq!(dvh.v, vec![100.0, 90.0, 80.0]);
+        assert_eq!(dvh.v, vec![1.0, 0.9, 0.8]);
     }
 
     #[test]
     fn test_dvh_sort_already_sorted() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(1.0, 100.0);
-        dvh.add(2.0, 90.0);
+        dvh.add(1.0, 1.0);
+        dvh.add(2.0, 0.9);
         dvh.sort();
 
         // Sort again should not change anything
@@ -455,14 +465,14 @@ mod tests {
 
         assert!(dvh.is_sorted);
         assert_eq!(dvh.d, vec![1.0, 2.0]);
-        assert_eq!(dvh.v, vec![100.0, 90.0]);
+        assert_eq!(dvh.v, vec![1.0, 0.9]);
     }
 
     #[test]
     fn test_dvh_dx_negative_volume() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(1.0, 100.0);
-        dvh.add(2.0, 90.0);
+        dvh.add(1.0, 1.0);
+        dvh.add(2.0, 0.9);
         dvh.sort();
 
         let result = dvh.dx(-10.0);
@@ -481,7 +491,7 @@ mod tests {
     #[test]
     fn test_dvh_dx_insufficient_data() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(1.0, 100.0);
+        dvh.add(1.0, 1.0);
         dvh.sort();
 
         let result = dvh.dx(50.0);
@@ -492,11 +502,11 @@ mod tests {
     #[test]
     fn test_dvh_dx_unsorted() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(1.0, 100.0);
-        dvh.add(2.0, 90.0);
+        dvh.add(1.0, 1.0);
+        dvh.add(2.0, 0.9);
         // Don't sort
 
-        let result = dvh.dx(95.0);
+        let result = dvh.dx(0.95);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), Error::DvhUnsorted));
     }
@@ -504,11 +514,11 @@ mod tests {
     #[test]
     fn test_dvh_dx_interpolation() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(0.0, 100.0);
-        dvh.add(10.0, 80.0);
+        dvh.add(0.0, 1.0);
+        dvh.add(10.0, 0.8);
         dvh.sort();
 
-        let result = dvh.dx(90.0);
+        let result = dvh.dx(0.9);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 5.0);
     }
@@ -516,11 +526,11 @@ mod tests {
     #[test]
     fn test_dvh_dx_below_minimum() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(0.0, 100.0);
-        dvh.add(10.0, 80.0);
+        dvh.add(0.0, 1.0);
+        dvh.add(10.0, 0.8);
         dvh.sort();
 
-        let result = dvh.dx(70.0);
+        let result = dvh.dx(0.7);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 10.0);
     }
@@ -528,11 +538,11 @@ mod tests {
     #[test]
     fn test_dvh_dx_above_maximum() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(0.0, 100.0);
-        dvh.add(10.0, 80.0);
+        dvh.add(0.0, 1.0);
+        dvh.add(10.0, 0.8);
         dvh.sort();
 
-        let result = dvh.dx(110.0);
+        let result = dvh.dx(1.1);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0.0);
     }
@@ -540,12 +550,12 @@ mod tests {
     #[test]
     fn test_dvh_dx_exact_match() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(0.0, 100.0);
-        dvh.add(5.0, 90.0);
-        dvh.add(10.0, 80.0);
+        dvh.add(0.0, 1.0);
+        dvh.add(5.0, 0.9);
+        dvh.add(10.0, 0.8);
         dvh.sort();
 
-        let result = dvh.dx(90.0);
+        let result = dvh.dx(0.9);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 5.0);
     }
@@ -553,31 +563,31 @@ mod tests {
     #[test]
     fn test_dvh_dx_multiple_points() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(0.0, 100.0);
-        dvh.add(5.0, 90.0);
-        dvh.add(10.0, 80.0);
-        dvh.add(15.0, 70.0);
+        dvh.add(0.0, 1.0);
+        dvh.add(5.0, 0.9);
+        dvh.add(10.0, 0.8);
+        dvh.add(15.0, 0.7);
         dvh.sort();
 
         // Test interpolation between different segments
-        let result = dvh.dx(85.0);
+        let result = dvh.dx(0.85);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 7.5);
+        assert_ulps_eq!(result.unwrap(), 7.5);
 
-        let result = dvh.dx(79.0);
+        let result = dvh.dx(0.79);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 10.5);
+        assert_ulps_eq!(result.unwrap(), 10.5);
 
-        let result = dvh.dx(71.0);
+        let result = dvh.dx(0.71);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 14.5);
+        assert_ulps_eq!(result.unwrap(), 14.5);
     }
 
     #[test]
     fn test_dvh_vx_negative_dose() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(1.0, 100.0);
-        dvh.add(2.0, 90.0);
+        dvh.add(1.0, 1.0);
+        dvh.add(2.0, 0.9);
         dvh.sort();
 
         let result = dvh.vx(-1.0);
@@ -596,7 +606,7 @@ mod tests {
     #[test]
     fn test_dvh_vx_insufficient_data() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(1.0, 100.0);
+        dvh.add(1.0, 1.0);
         dvh.sort();
 
         let result = dvh.vx(1.0);
@@ -607,8 +617,8 @@ mod tests {
     #[test]
     fn test_dvh_vx_unsorted() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(1.0, 100.0);
-        dvh.add(2.0, 90.0);
+        dvh.add(1.0, 1.0);
+        dvh.add(2.0, 0.9);
         // Don't sort
 
         let result = dvh.vx(1.5);
@@ -619,81 +629,81 @@ mod tests {
     #[test]
     fn test_dvh_vx_below_minimum() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(5.0, 100.0);
-        dvh.add(10.0, 80.0);
+        dvh.add(5.0, 1.0);
+        dvh.add(10.0, 0.8);
         dvh.sort();
 
         let result = dvh.vx(3.0);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 100.0);
+        assert_eq!(result.unwrap(), 1.0);
     }
 
     #[test]
     fn test_dvh_vx_above_maximum() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(5.0, 100.0);
-        dvh.add(10.0, 80.0);
+        dvh.add(5.0, 1.0);
+        dvh.add(10.0, 0.8);
         dvh.sort();
 
         let result = dvh.vx(15.0);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 80.0);
+        assert_ulps_eq!(result.unwrap(), 0.8);
     }
 
     #[test]
     fn test_dvh_vx_exact_match() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(0.0, 100.0);
-        dvh.add(5.0, 90.0);
-        dvh.add(10.0, 80.0);
+        dvh.add(0.0, 1.0);
+        dvh.add(5.0, 0.9);
+        dvh.add(10.0, 0.8);
         dvh.sort();
 
         let result = dvh.vx(5.0);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 90.0);
+        assert_ulps_eq!(result.unwrap(), 0.9);
     }
 
     #[test]
     fn test_dvh_vx_interpolation() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(0.0, 100.0);
-        dvh.add(10.0, 80.0);
+        dvh.add(0.0, 1.0);
+        dvh.add(10.0, 0.8);
         dvh.sort();
 
         let result = dvh.vx(5.0);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 90.0);
+        assert_ulps_eq!(result.unwrap(), 0.9);
 
         let result = dvh.vx(2.0);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 96.0);
+        assert_ulps_eq!(result.unwrap(), 0.96);
 
         let result = dvh.vx(8.0);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 84.0);
+        assert_ulps_eq!(result.unwrap(), 0.84);
     }
 
     #[test]
     fn test_dvh_vx_multiple_points() {
         let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
-        dvh.add(0.0, 100.0);
-        dvh.add(5.0, 90.0);
-        dvh.add(10.0, 80.0);
-        dvh.add(15.0, 70.0);
+        dvh.add(0.0, 1.0);
+        dvh.add(5.0, 0.9);
+        dvh.add(10.0, 0.8);
+        dvh.add(15.0, 0.7);
         dvh.sort();
 
         // Test interpolation between different segments
         let result = dvh.vx(7.5);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 85.0);
+        assert_ulps_eq!(result.unwrap(), 0.85);
     }
 
     #[test]
     #[cfg(feature = "serde")]
     fn test_dvh_serde() {
         let mut dvh = Dvh::new(DoseType::CGy, VolumeType::Cc);
-        dvh.add(0.0, 100.0);
-        dvh.add(10.0, 80.0);
+        dvh.add(0.0, 1.0);
+        dvh.add(10.0, 0.8);
         dvh.sort();
 
         let serialized = serde_json::to_string(&dvh).unwrap();
@@ -702,7 +712,7 @@ mod tests {
         assert_eq!(deserialized.dose_type, DoseType::CGy);
         assert_eq!(deserialized.volume_type, VolumeType::Cc);
         assert_eq!(deserialized.len(), 2);
-        assert_eq!(deserialized.dx(90.0).unwrap(), 5.0);
+        assert_ulps_eq!(deserialized.dx(0.9).unwrap(), 5.0);
     }
 }
 
