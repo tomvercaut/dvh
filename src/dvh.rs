@@ -70,6 +70,9 @@ pub struct Dvh {
     // If the volume type is [Percent](VolumeType::Percent), the values are in the range [0.0, 1.0]
     v: Vec<f64>,
     // Is the data sorted monotonically incrementally along the dose axis?
+    // With serde is enabled, the value is not serialized and deserialized
+    // because the input data can't be trusted to be sorted.
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     is_sorted: bool,
 }
 
@@ -707,7 +710,8 @@ mod tests {
         dvh.sort();
 
         let serialized = serde_json::to_string(&dvh).unwrap();
-        let deserialized: Dvh = serde_json::from_str(&serialized).unwrap();
+        let mut deserialized: Dvh = serde_json::from_str(&serialized).unwrap();
+        deserialized.sort();
 
         assert_eq!(deserialized.dose_type, DoseType::CGy);
         assert_eq!(deserialized.volume_type, VolumeType::Cc);

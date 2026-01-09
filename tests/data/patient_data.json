@@ -30,8 +30,7 @@
             0.95,
             0.5,
             0.0
-          ],
-          "is_sorted": true
+          ]
         },
         "Rectum": {
           "dose_type": "Gy",
@@ -49,8 +48,7 @@
             0.2,
             0.1,
             0.0
-          ],
-          "is_sorted": true
+          ]
         }
       }
     },
@@ -74,8 +72,7 @@
             1.0,
             0.9,
             0.0
-          ],
-          "is_sorted": true
+          ]
         },
         "Bladder": {
           "dose_type": "Gy",
@@ -93,8 +90,7 @@
             0.4,
             0.1,
             0.0
-          ],
-          "is_sorted": true
+          ]
         }
       }
     }

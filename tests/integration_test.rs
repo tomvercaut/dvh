@@ -1,4 +1,6 @@
+#[cfg(feature = "serde")]
 use dvh::Patient;
+#[cfg(feature = "serde")]
 use std::fs;
 
 #[test]
@@ -7,8 +9,14 @@ fn test_integration_read_from_json() {
     let json_content = fs::read_to_string("tests/data/patient_data.json")
         .expect("Should have been able to read the file");
 
-    let patient: Patient = serde_json::from_str(&json_content)
+    let mut patient: Patient = serde_json::from_str(&json_content)
         .expect("Failed to deserialize patient from JSON");
+
+    for plan in patient.plans.iter_mut() {
+        for dvhs in plan.dvhs.values_mut() {
+            dvhs.sort();
+        }
+    }
 
     // Verify Patient info
     assert_eq!(patient.patient_id, "P-123");
