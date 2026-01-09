@@ -15,6 +15,10 @@ pub enum Error {
     NegativeVolume,
     #[error("A negative dose value is not valid.")]
     NegativeDose,
+    #[error("The volume in percent is out of range [0.0, 1.0].")]
+    PercentVolumeOutOfRange,
+    #[error("The length of the dose and volume arrays is different.")]
+    MismatchedLengthDoseVolumeData,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

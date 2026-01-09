@@ -1,5 +1,5 @@
+use crate::traits::DvhCheck;
 use crate::Error;
-
 
 /// Performs linear interpolation between two points.
 ///
@@ -173,7 +173,7 @@ impl Dvh {
     /// This method sorts both the dose and volume vectors together, maintaining
     /// the correspondence between dose-volume pairs. If the data is already sorted,
     /// this is a no-op.
-    pub fn sort(&mut self) {
+    fn sort(&mut self) {
         if self.is_sorted {
             return;
         }
@@ -220,8 +220,8 @@ impl Dvh {
         }
 
         let n = self.v.len();
-        let mut x0 = self.v[n-1];
-        let mut y0 = self.d[n-1];
+        let mut x0 = self.v[n - 1];
+        let mut y0 = self.d[n - 1];
         if volume <= x0 {
             return Ok(y0);
         }
@@ -310,10 +310,71 @@ impl Dvh {
     }
 }
 
+impl DvhCheck for Dvh {
+    /// Validates the DVH data.
+    ///
+    /// This method performs the following validation checks:
+    /// - Ensures that dose and volume vectors have the same length
+    /// - Verifies that all dose values are non-negative
+    /// - Verifies that all volume values are non-negative
+    /// - If the volume type is [Percent](VolumeType::Percent), verifies that all volume values are in the range [0.0, 1.0]
+    /// - Sorts the DVH data by dose in ascending order if not already sorted
+    ///
+    /// # Returns
+    /// - `Ok(())` if all validations pass and data is successfully normalized
+    ///
+    /// # Errors
+    /// - `Error::MismatchedLengthDoseVolumeData`: If dose and volume vectors have different lengths
+    /// - `Error::NegativeDose`: If any dose value is negative
+    /// - `Error::NegativeVolume`: If any volume value is negative
+    /// - `Error::PercentVolumeOutOfRange`: If the volume type is [Percent](VolumeType::Percent) and any volume value exceeds 1.0
+    ///
+    /// # Example
+    /// ```
+    /// use dvh::{Dvh, DoseType, VolumeType, DvhCheck};
+    ///
+    /// let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+    /// dvh.add(10.0, 0.8);
+    /// dvh.add(5.0, 1.0);
+    /// dvh.add(15.0, 0.5);
+    ///
+    /// // Validate and sort the data
+    /// assert!(dvh.dvh_check().is_ok());
+    /// assert_eq!(dvh.doses(), vec![5.0, 10.0, 15.0]);
+    /// assert_eq!(dvh.volumes(), vec![1.0, 0.8, 0.5]);
+    /// ```
+
+    fn dvh_check(&mut self) -> crate::Result<()> {
+        if self.d.len() != self.v.len() {
+            return Err(Error::MismatchedLengthDoseVolumeData);
+        }
+        for x in &self.d {
+            if *x < 0.0 {
+                return Err(Error::NegativeDose);
+            }
+        }
+        for x in &self.v {
+            if *x < 0.0 {
+                return Err(Error::NegativeVolume);
+            }
+            if self.volume_type == VolumeType::Percent && *x > 1.0 {
+                return Err(Error::PercentVolumeOutOfRange);
+            }
+        }
+        {
+            let is_sorted = self.is_sorted;
+            if !is_sorted {
+                self.sort();
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use approx::assert_ulps_eq;
     use super::*;
+    use approx::assert_ulps_eq;
 
     #[test]
     fn test_linear_interpolation_normal() {
@@ -718,5 +779,91 @@ mod tests {
         assert_eq!(deserialized.len(), 2);
         assert_ulps_eq!(deserialized.dx(0.9).unwrap(), 5.0);
     }
-}
 
+    #[test]
+    fn test_dvh_check_mismatched_lengths() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.d = vec![1.0, 2.0, 3.0];
+        dvh.v = vec![1.0, 0.9];
+
+        let result = dvh.dvh_check();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            Error::MismatchedLengthDoseVolumeData
+        ));
+    }
+
+    #[test]
+    fn test_dvh_check_negative_dose() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.d = vec![1.0, -2.0, 3.0];
+        dvh.v = vec![1.0, 0.9, 0.8];
+
+        let result = dvh.dvh_check();
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::NegativeDose));
+    }
+
+    #[test]
+    fn test_dvh_check_negative_volume() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.d = vec![1.0, 2.0, 3.0];
+        dvh.v = vec![1.0, -0.9, 0.8];
+
+        let result = dvh.dvh_check();
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::NegativeVolume));
+    }
+
+    #[test]
+    fn test_dvh_check_percent_volume_out_of_range() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.d = vec![1.0, 2.0, 3.0];
+        dvh.v = vec![1.0, 1.5, 0.8];
+
+        let result = dvh.dvh_check();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            Error::PercentVolumeOutOfRange
+        ));
+    }
+
+    #[test]
+    fn test_dvh_check_success_with_sorting() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.add(10.0, 0.8);
+        dvh.add(5.0, 1.0);
+        dvh.add(15.0, 0.5);
+
+        let result = dvh.dvh_check();
+        assert!(result.is_ok());
+        assert!(dvh.is_sorted);
+        assert_eq!(dvh.doses(), vec![5.0, 10.0, 15.0]);
+        assert_eq!(dvh.volumes(), vec![1.0, 0.8, 0.5]);
+    }
+
+    #[test]
+    fn test_dvh_check_empty() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+
+        let result = dvh.dvh_check();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_dvh_check_already_sorted() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.add(5.0, 1.0);
+        dvh.add(10.0, 0.8);
+        dvh.add(15.0, 0.5);
+        dvh.sort();
+
+        let result = dvh.dvh_check();
+        assert!(result.is_ok());
+        assert!(dvh.is_sorted);
+        assert_eq!(dvh.doses(), vec![5.0, 10.0, 15.0]);
+        assert_eq!(dvh.volumes(), vec![1.0, 0.8, 0.5]);
+    }
+}

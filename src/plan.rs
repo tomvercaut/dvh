@@ -5,6 +5,7 @@
 
 use crate::Dvh;
 use std::collections::HashMap;
+use crate::traits::DvhCheck;
 
 /// Represents a radiation therapy treatment plan.
 ///
@@ -19,4 +20,13 @@ pub struct Plan {
     pub name: Option<String>,
     /// Collection of DVHs mapped by structure name or identifier.
     pub dvhs: HashMap<String, Dvh>,
+}
+
+impl DvhCheck for Plan {
+    fn dvh_check(&mut self) -> crate::Result<()> {
+        for dvh in self.dvhs.values_mut() {
+            dvh.dvh_check()?;
+        }
+        Ok(())
+    }
 }

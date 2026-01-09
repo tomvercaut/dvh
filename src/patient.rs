@@ -6,6 +6,7 @@
 
 use crate::name::Name;
 use crate::plan::Plan;
+use crate::traits::DvhCheck;
 
 /// Represents a patient in a radiation therapy context.
 ///
@@ -20,6 +21,15 @@ pub struct Patient {
     pub name: Option<Name>,
     /// Collection of treatment plans associated with this patient.
     pub plans: Vec<Plan>,
+}
+
+impl DvhCheck for Patient {
+    fn dvh_check(&mut self) -> crate::Result<()> {
+        for plan in self.plans.iter_mut() {
+            plan.dvh_check()?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(all(test, feature = "serde"))]
