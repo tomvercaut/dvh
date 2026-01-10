@@ -3,9 +3,9 @@
 //! This module provides the [`Plan`] struct for representing radiation therapy
 //! treatment plans, including their associated dose-volume histograms.
 
-use crate::Dvh;
-use std::collections::HashMap;
 use crate::traits::DvhCheck;
+use crate::{Dvh, MaxDose};
+use std::collections::HashMap;
 
 /// Represents a radiation therapy treatment plan.
 ///
@@ -28,5 +28,15 @@ impl DvhCheck for Plan {
             dvh.dvh_check()?;
         }
         Ok(())
+    }
+}
+
+impl MaxDose for Plan {
+    fn max_dose(&self) -> f64 {
+        self.dvhs
+            .values()
+            .map(|dvh| dvh.max_dose())
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(0.0)
     }
 }

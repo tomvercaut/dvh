@@ -1,5 +1,5 @@
 use crate::traits::DvhCheck;
-use crate::Error;
+use crate::{Error, MaxDose};
 
 /// Performs linear interpolation between two points.
 ///
@@ -90,7 +90,7 @@ impl Dvh {
             volume_type,
             d: Default::default(),
             v: Default::default(),
-            is_sorted: true,
+            is_sorted: false,
         }
     }
 
@@ -371,6 +371,23 @@ impl DvhCheck for Dvh {
     }
 }
 
+impl MaxDose for Dvh {
+    fn max_dose(&self) -> f64 {
+        if self.d.is_empty() {
+            return 0.0;
+        }
+        if self.is_sorted {
+            return *self.doses().last().unwrap();
+        }
+        let a = *self.d.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        if a >= 0.0 {
+            a
+        } else {
+            0.0
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,7 +419,7 @@ mod tests {
         let dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
         assert!(dvh.is_empty());
         assert_eq!(dvh.len(), 0);
-        assert!(dvh.is_sorted);
+        assert!(!dvh.is_sorted);
     }
 
     #[test]
@@ -865,5 +882,56 @@ mod tests {
         assert!(dvh.is_sorted);
         assert_eq!(dvh.doses(), vec![5.0, 10.0, 15.0]);
         assert_eq!(dvh.volumes(), vec![1.0, 0.8, 0.5]);
+    }
+
+    #[test]
+    fn test_max_dose_empty() {
+        let dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        assert_eq!(dvh.max_dose(), 0.0);
+    }
+
+    #[test]
+    fn test_max_dose_single_value() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.add(42.5, 1.0);
+        assert_ulps_eq!(dvh.max_dose(), 42.5);
+    }
+
+    #[test]
+    fn test_max_dose_multiple_values() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.add(10.0, 1.0);
+        dvh.add(25.0, 0.8);
+        dvh.add(15.0, 0.9);
+        dvh.add(50.0, 0.5);
+        dvh.add(30.0, 0.7);
+        assert_ulps_eq!(dvh.max_dose(), 50.0);
+    }
+
+    #[test]
+    fn test_max_dose_with_negative_values() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.d = vec![-5.0, -10.0, -2.0];
+        dvh.v = vec![1.0, 0.8, 0.9];
+        assert_eq!(dvh.max_dose(), 0.0);
+    }
+
+    #[test]
+    fn test_max_dose_all_zeros() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.add(0.0, 1.0);
+        dvh.add(0.0, 0.8);
+        dvh.add(0.0, 0.5);
+        assert_eq!(dvh.max_dose(), 0.0);
+    }
+
+    #[test]
+    fn test_max_dose_unsorted() {
+        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        dvh.add(30.0, 0.7);
+        dvh.add(10.0, 1.0);
+        dvh.add(50.0, 0.5);
+        dvh.add(25.0, 0.8);
+        assert_ulps_eq!(dvh.max_dose(), 50.0);
     }
 }

@@ -25,3 +25,14 @@ pub trait DvhCheck {
 
     fn dvh_check(&mut self) -> crate::Result<()>;
 }
+
+/// Trait for computing the maximum dose for the implementing type.
+pub trait MaxDose {
+    /// Computes and returns the maximum dose value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the maximum dose value as an `f64`. If no dose data is available
+    /// or the collection is empty, the behavior is to return 0.0;
+    fn max_dose(&self) -> f64;
+}
