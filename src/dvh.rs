@@ -29,6 +29,7 @@ fn linear_interpolation(x: f64, x0: f64, x1: f64, y0: f64, y1: f64) -> f64 {
 pub enum DoseUnit {
     #[default]
     Gy,
+    #[cfg_attr(feature = "serde", serde(rename = "cGy"))]
     CGy,
 }
 
