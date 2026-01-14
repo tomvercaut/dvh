@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use crate::traits::DvhCheck;
 use crate::{Error, MaxDose};
 
@@ -33,6 +34,15 @@ pub enum DoseUnit {
     CGy,
 }
 
+impl Display for DoseUnit {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DoseUnit::Gy => write!(f, "Gy"),
+            DoseUnit::CGy => write!(f, "cGy"),
+        }
+    }
+}
+
 /// Represents the unit type for volume measurements in dose-volume histograms.
 ///
 /// # Variants
@@ -44,6 +54,15 @@ pub enum VolumeUnit {
     #[default]
     Percent,
     Cc,
+}
+
+impl Display for VolumeUnit {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VolumeUnit::Percent => write!(f, "%"),
+            VolumeUnit::Cc => write!(f, "cc"),
+        }
+    }
 }
 
 /// Dose-Volume Histogram (DVH) structure for radiation therapy analysis.
