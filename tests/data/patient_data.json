@@ -13,8 +13,8 @@
       "name": "Initial Treatment",
       "dvhs": {
         "PTV": {
-          "dose_type": "Gy",
-          "volume_type": "Percent",
+          "dose_unit": "Gy",
+          "volume_unit": "Percent",
           "d": [
             0.0,
             10.0,
@@ -33,8 +33,8 @@
           ]
         },
         "Rectum": {
-          "dose_type": "Gy",
-          "volume_type": "Percent",
+          "dose_unit": "Gy",
+          "volume_unit": "Percent",
           "d": [
             0.0,
             10.0,
@@ -57,8 +57,8 @@
       "name": "Boost",
       "dvhs": {
         "PTV": {
-          "dose_type": "Gy",
-          "volume_type": "Percent",
+          "dose_unit": "Gy",
+          "volume_unit": "Percent",
           "d": [
             0.0,
             5.0,
@@ -75,8 +75,8 @@
           ]
         },
         "Bladder": {
-          "dose_type": "Gy",
-          "volume_type": "Percent",
+          "dose_unit": "Gy",
+          "volume_unit": "Percent",
           "d": [
             0.0,
             5.0,

@@ -26,7 +26,7 @@ fn linear_interpolation(x: f64, x0: f64, x1: f64, y0: f64, y1: f64) -> f64 {
 /// - `CGy`: Centigray
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum DoseType {
+pub enum DoseUnit {
     #[default]
     Gy,
     CGy,
@@ -39,7 +39,7 @@ pub enum DoseType {
 /// - `Cc`: Volume expressed in cc, cm³
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum VolumeType {
+pub enum VolumeUnit {
     #[default]
     Percent,
     Cc,
@@ -55,15 +55,15 @@ pub enum VolumeType {
 /// - `dose_type`: The unit type for dose measurements
 /// - `d`: Vector of dose values
 /// - `v`: Vector of volume values
-///        If the volume type is [Percent](VolumeType::Percent), the values are in the range [0.0, 1.0]
+///        If the volume type is [Percent](VolumeUnit::Percent), the values are in the range [0.0, 1.0]
 /// - `is_sorted`: Whether the data is sorted by dose in ascending order
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Dvh {
     // The unit type for dose
-    pub dose_type: DoseType,
+    pub dose_unit: DoseUnit,
     // Volume type
-    pub volume_type: VolumeType,
+    pub volume_unit: VolumeUnit,
     // Doses
     d: Vec<f64>,
     // Volumes
@@ -84,10 +84,10 @@ impl Dvh {
     ///
     /// # Returns
     /// A new empty DVH instance
-    pub fn new(dose_type: DoseType, volume_type: VolumeType) -> Dvh {
+    pub fn new(dose_type: DoseUnit, volume_type: VolumeUnit) -> Dvh {
         Self {
-            dose_type,
-            volume_type,
+            dose_unit: dose_type,
+            volume_unit: volume_type,
             d: Default::default(),
             v: Default::default(),
             is_sorted: false,
@@ -115,7 +115,7 @@ impl Dvh {
     /// # Parameters
     /// - `d`: The dose value (must be non-negative)
     /// - `v`: The volume value (must be non-negative)
-    ///        If the volume type is [Percent](VolumeType::Percent), the values are in the range [0.0, 1.0]
+    ///        If the volume type is [Percent](VolumeUnit::Percent), the values are in the range [0.0, 1.0]
     ///
     /// # Returns
     /// `true` if the data point was added successfully, `false` if either value is negative
@@ -126,7 +126,7 @@ impl Dvh {
         if v < 0.0 {
             return false;
         }
-        if self.volume_type == VolumeType::Percent && v > 1.0 {
+        if self.volume_unit == VolumeUnit::Percent && v > 1.0 {
             return false;
         }
         self.is_sorted = false;
@@ -157,7 +157,7 @@ impl Dvh {
             if *x < 0.0 {
                 return false;
             }
-            if self.volume_type == VolumeType::Percent && *x > 1.0 {
+            if self.volume_unit == VolumeUnit::Percent && *x > 1.0 {
                 return false;
             }
         }
@@ -317,7 +317,7 @@ impl DvhCheck for Dvh {
     /// - Ensures that dose and volume vectors have the same length
     /// - Verifies that all dose values are non-negative
     /// - Verifies that all volume values are non-negative
-    /// - If the volume type is [Percent](VolumeType::Percent), verifies that all volume values are in the range [0.0, 1.0]
+    /// - If the volume type is [Percent](VolumeUnit::Percent), verifies that all volume values are in the range [0.0, 1.0]
     /// - Sorts the DVH data by dose in ascending order if not already sorted
     ///
     /// # Returns
@@ -327,13 +327,13 @@ impl DvhCheck for Dvh {
     /// - `Error::MismatchedLengthDoseVolumeData`: If dose and volume vectors have different lengths
     /// - `Error::NegativeDose`: If any dose value is negative
     /// - `Error::NegativeVolume`: If any volume value is negative
-    /// - `Error::PercentVolumeOutOfRange`: If the volume type is [Percent](VolumeType::Percent) and any volume value exceeds 1.0
+    /// - `Error::PercentVolumeOutOfRange`: If the volume type is [Percent](VolumeUnit::Percent) and any volume value exceeds 1.0
     ///
     /// # Example
     /// ```
-    /// use dvh::{Dvh, DoseType, VolumeType, DvhCheck};
+    /// use dvh::{Dvh, DoseUnit, VolumeUnit, DvhCheck};
     ///
-    /// let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+    /// let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
     /// dvh.add(10.0, 0.8);
     /// dvh.add(5.0, 1.0);
     /// dvh.add(15.0, 0.5);
@@ -357,7 +357,7 @@ impl DvhCheck for Dvh {
             if *x < 0.0 {
                 return Err(Error::NegativeVolume);
             }
-            if self.volume_type == VolumeType::Percent && *x > 1.0 {
+            if self.volume_unit == VolumeUnit::Percent && *x > 1.0 {
                 return Err(Error::PercentVolumeOutOfRange);
             }
         }
@@ -416,7 +416,7 @@ mod tests {
 
     #[test]
     fn test_dvh_new() {
-        let dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         assert!(dvh.is_empty());
         assert_eq!(dvh.len(), 0);
         assert!(!dvh.is_sorted);
@@ -424,15 +424,15 @@ mod tests {
 
     #[test]
     fn test_dvh_new_cgy() {
-        let dvh = Dvh::new(DoseType::CGy, VolumeType::Cc);
+        let dvh = Dvh::new(DoseUnit::CGy, VolumeUnit::Cc);
         assert!(dvh.is_empty());
-        assert!(matches!(dvh.dose_type, DoseType::CGy));
-        assert!(matches!(dvh.volume_type, VolumeType::Cc));
+        assert!(matches!(dvh.dose_unit, DoseUnit::CGy));
+        assert!(matches!(dvh.volume_unit, VolumeUnit::Cc));
     }
 
     #[test]
     fn test_dvh_len_and_is_empty() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         assert_eq!(dvh.len(), 0);
         assert!(dvh.is_empty());
 
@@ -447,7 +447,7 @@ mod tests {
 
     #[test]
     fn test_dvh_add_valid() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         assert!(dvh.add(1.0, 1.0));
         assert_eq!(dvh.len(), 1);
         assert!(!dvh.is_sorted);
@@ -455,28 +455,28 @@ mod tests {
 
     #[test]
     fn test_dvh_add_negative_dose() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         assert!(!dvh.add(-1.0, 100.0));
         assert_eq!(dvh.len(), 0);
     }
 
     #[test]
     fn test_dvh_add_negative_volume() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         assert!(!dvh.add(1.0, -1.0));
         assert_eq!(dvh.len(), 0);
     }
 
     #[test]
     fn test_dvh_add_zero_values() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         assert!(dvh.add(0.0, 0.0));
         assert_eq!(dvh.len(), 1);
     }
 
     #[test]
     fn test_dvh_add_slice_valid() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         let doses = vec![1.0, 2.0, 3.0];
         let volumes = vec![1.0, 0.9, 0.8];
         assert!(dvh.add_slice(&doses, &volumes));
@@ -486,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_dvh_add_slice_mismatched_length() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         let doses = vec![1.0, 2.0];
         let volumes = vec![100.0, 90.0, 80.0];
         assert!(!dvh.add_slice(&doses, &volumes));
@@ -495,7 +495,7 @@ mod tests {
 
     #[test]
     fn test_dvh_add_slice_negative_dose() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         let doses = vec![1.0, -2.0, 3.0];
         let volumes = vec![100.0, 90.0, 80.0];
         assert!(!dvh.add_slice(&doses, &volumes));
@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_dvh_add_slice_negative_volume() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         let doses = vec![1.0, 2.0, 3.0];
         let volumes = vec![1.0, -0.9, 0.8];
         assert!(!dvh.add_slice(&doses, &volumes));
@@ -513,7 +513,7 @@ mod tests {
 
     #[test]
     fn test_dvh_add_slice_empty() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         let doses: Vec<f64> = vec![];
         let volumes: Vec<f64> = vec![];
         assert!(dvh.add_slice(&doses, &volumes));
@@ -522,7 +522,7 @@ mod tests {
 
     #[test]
     fn test_dvh_sort() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(3.0, 0.8);
         dvh.add(1.0, 1.0);
         dvh.add(2.0, 0.9);
@@ -536,7 +536,7 @@ mod tests {
 
     #[test]
     fn test_dvh_sort_already_sorted() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(1.0, 1.0);
         dvh.add(2.0, 0.9);
         dvh.sort();
@@ -551,7 +551,7 @@ mod tests {
 
     #[test]
     fn test_dvh_dx_negative_volume() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(1.0, 1.0);
         dvh.add(2.0, 0.9);
         dvh.sort();
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_dvh_dx_empty() {
-        let dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         let result = dvh.dx(50.0);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), Error::DvhNoData));
@@ -571,7 +571,7 @@ mod tests {
 
     #[test]
     fn test_dvh_dx_insufficient_data() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(1.0, 1.0);
         dvh.sort();
 
@@ -582,7 +582,7 @@ mod tests {
 
     #[test]
     fn test_dvh_dx_unsorted() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(1.0, 1.0);
         dvh.add(2.0, 0.9);
         // Don't sort
@@ -594,7 +594,7 @@ mod tests {
 
     #[test]
     fn test_dvh_dx_interpolation() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(0.0, 1.0);
         dvh.add(10.0, 0.8);
         dvh.sort();
@@ -606,7 +606,7 @@ mod tests {
 
     #[test]
     fn test_dvh_dx_below_minimum() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(0.0, 1.0);
         dvh.add(10.0, 0.8);
         dvh.sort();
@@ -618,7 +618,7 @@ mod tests {
 
     #[test]
     fn test_dvh_dx_above_maximum() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(0.0, 1.0);
         dvh.add(10.0, 0.8);
         dvh.sort();
@@ -630,7 +630,7 @@ mod tests {
 
     #[test]
     fn test_dvh_dx_exact_match() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(0.0, 1.0);
         dvh.add(5.0, 0.9);
         dvh.add(10.0, 0.8);
@@ -643,7 +643,7 @@ mod tests {
 
     #[test]
     fn test_dvh_dx_multiple_points() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(0.0, 1.0);
         dvh.add(5.0, 0.9);
         dvh.add(10.0, 0.8);
@@ -666,7 +666,7 @@ mod tests {
 
     #[test]
     fn test_dvh_vx_negative_dose() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(1.0, 1.0);
         dvh.add(2.0, 0.9);
         dvh.sort();
@@ -678,7 +678,7 @@ mod tests {
 
     #[test]
     fn test_dvh_vx_empty() {
-        let dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         let result = dvh.vx(5.0);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), Error::DvhNoData));
@@ -686,7 +686,7 @@ mod tests {
 
     #[test]
     fn test_dvh_vx_insufficient_data() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(1.0, 1.0);
         dvh.sort();
 
@@ -697,7 +697,7 @@ mod tests {
 
     #[test]
     fn test_dvh_vx_unsorted() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(1.0, 1.0);
         dvh.add(2.0, 0.9);
         // Don't sort
@@ -709,7 +709,7 @@ mod tests {
 
     #[test]
     fn test_dvh_vx_below_minimum() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(5.0, 1.0);
         dvh.add(10.0, 0.8);
         dvh.sort();
@@ -721,7 +721,7 @@ mod tests {
 
     #[test]
     fn test_dvh_vx_above_maximum() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(5.0, 1.0);
         dvh.add(10.0, 0.8);
         dvh.sort();
@@ -733,7 +733,7 @@ mod tests {
 
     #[test]
     fn test_dvh_vx_exact_match() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(0.0, 1.0);
         dvh.add(5.0, 0.9);
         dvh.add(10.0, 0.8);
@@ -746,7 +746,7 @@ mod tests {
 
     #[test]
     fn test_dvh_vx_interpolation() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(0.0, 1.0);
         dvh.add(10.0, 0.8);
         dvh.sort();
@@ -766,7 +766,7 @@ mod tests {
 
     #[test]
     fn test_dvh_vx_multiple_points() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(0.0, 1.0);
         dvh.add(5.0, 0.9);
         dvh.add(10.0, 0.8);
@@ -782,7 +782,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn test_dvh_serde() {
-        let mut dvh = Dvh::new(DoseType::CGy, VolumeType::Cc);
+        let mut dvh = Dvh::new(DoseUnit::CGy, VolumeUnit::Cc);
         dvh.add(0.0, 1.0);
         dvh.add(10.0, 0.8);
         dvh.sort();
@@ -791,15 +791,15 @@ mod tests {
         let mut deserialized: Dvh = serde_json::from_str(&serialized).unwrap();
         deserialized.sort();
 
-        assert_eq!(deserialized.dose_type, DoseType::CGy);
-        assert_eq!(deserialized.volume_type, VolumeType::Cc);
+        assert_eq!(deserialized.dose_unit, DoseUnit::CGy);
+        assert_eq!(deserialized.volume_unit, VolumeUnit::Cc);
         assert_eq!(deserialized.len(), 2);
         assert_ulps_eq!(deserialized.dx(0.9).unwrap(), 5.0);
     }
 
     #[test]
     fn test_dvh_check_mismatched_lengths() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.d = vec![1.0, 2.0, 3.0];
         dvh.v = vec![1.0, 0.9];
 
@@ -813,7 +813,7 @@ mod tests {
 
     #[test]
     fn test_dvh_check_negative_dose() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.d = vec![1.0, -2.0, 3.0];
         dvh.v = vec![1.0, 0.9, 0.8];
 
@@ -824,7 +824,7 @@ mod tests {
 
     #[test]
     fn test_dvh_check_negative_volume() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.d = vec![1.0, 2.0, 3.0];
         dvh.v = vec![1.0, -0.9, 0.8];
 
@@ -835,7 +835,7 @@ mod tests {
 
     #[test]
     fn test_dvh_check_percent_volume_out_of_range() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.d = vec![1.0, 2.0, 3.0];
         dvh.v = vec![1.0, 1.5, 0.8];
 
@@ -849,7 +849,7 @@ mod tests {
 
     #[test]
     fn test_dvh_check_success_with_sorting() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(10.0, 0.8);
         dvh.add(5.0, 1.0);
         dvh.add(15.0, 0.5);
@@ -863,7 +863,7 @@ mod tests {
 
     #[test]
     fn test_dvh_check_empty() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
 
         let result = dvh.dvh_check();
         assert!(result.is_ok());
@@ -871,7 +871,7 @@ mod tests {
 
     #[test]
     fn test_dvh_check_already_sorted() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(5.0, 1.0);
         dvh.add(10.0, 0.8);
         dvh.add(15.0, 0.5);
@@ -886,20 +886,20 @@ mod tests {
 
     #[test]
     fn test_max_dose_empty() {
-        let dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         assert_eq!(dvh.max_dose(), 0.0);
     }
 
     #[test]
     fn test_max_dose_single_value() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(42.5, 1.0);
         assert_ulps_eq!(dvh.max_dose(), 42.5);
     }
 
     #[test]
     fn test_max_dose_multiple_values() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(10.0, 1.0);
         dvh.add(25.0, 0.8);
         dvh.add(15.0, 0.9);
@@ -910,7 +910,7 @@ mod tests {
 
     #[test]
     fn test_max_dose_with_negative_values() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.d = vec![-5.0, -10.0, -2.0];
         dvh.v = vec![1.0, 0.8, 0.9];
         assert_eq!(dvh.max_dose(), 0.0);
@@ -918,7 +918,7 @@ mod tests {
 
     #[test]
     fn test_max_dose_all_zeros() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(0.0, 1.0);
         dvh.add(0.0, 0.8);
         dvh.add(0.0, 0.5);
@@ -927,7 +927,7 @@ mod tests {
 
     #[test]
     fn test_max_dose_unsorted() {
-        let mut dvh = Dvh::new(DoseType::Gy, VolumeType::Percent);
+        let mut dvh = Dvh::new(DoseUnit::Gy, VolumeUnit::Percent);
         dvh.add(30.0, 0.7);
         dvh.add(10.0, 1.0);
         dvh.add(50.0, 0.5);
